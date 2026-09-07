@@ -3096,13 +3096,8 @@ def _oracle_region_ids(num_imgs, p_h, p_w, block_size, num_special_tokens, devic
     return ids
 
 
-def _oracle_piecewise_abs_sum(s, m, weights, z_values):
-    """Evaluate sum_r weights[r] * |s[r] - z * m[r]| for many z values.
-
-    The breakpoints s[r] / m[r] make this a piecewise-linear function. Evaluating
-    it this way avoids materializing a candidate-by-region tensor in every greedy
-    step while remaining exactly equivalent to the objective definition.
-    """
+def _oracle_piecewise_abs_prepare(s, m, weights):
+    """Prepare the piecewise-linear absolute-sum state for one greedy round."""
     eps = torch.finfo(s.dtype).tiny
     breakpoints = s / m.clamp_min(eps)
     sorted_breakpoints, order = torch.sort(breakpoints, dim=1)
@@ -3111,15 +3106,30 @@ def _oracle_piecewise_abs_sum(s, m, weights, z_values):
     prefix_wm = torch.cumsum(sorted_wm, dim=1)
     prefix_ws = torch.cumsum(sorted_ws, dim=1)
 
+    return (
+        sorted_breakpoints,
+        F.pad(prefix_wm, (1, 0)),
+        F.pad(prefix_ws, (1, 0)),
+        sorted_wm.sum(dim=1, keepdim=True),
+        sorted_ws.sum(dim=1, keepdim=True),
+    )
+
+
+def _oracle_piecewise_abs_eval(state, z_values):
+    """Evaluate a prepared piecewise-linear absolute-sum state."""
+    (
+        sorted_breakpoints,
+        prefix_wm_pad,
+        prefix_ws_pad,
+        total_wm,
+        total_ws,
+    ) = state
+
     # searchsorted supports one sorted boundary row per query row.
     right_count = torch.searchsorted(sorted_breakpoints, z_values, right=True)
     right_count = right_count.clamp_max(sorted_breakpoints.shape[1])
-    prefix_wm_pad = F.pad(prefix_wm, (1, 0))
-    prefix_ws_pad = F.pad(prefix_ws, (1, 0))
     left_wm = prefix_wm_pad.gather(1, right_count)
     left_ws = prefix_ws_pad.gather(1, right_count)
-    total_wm = sorted_wm.sum(dim=1, keepdim=True)
-    total_ws = sorted_ws.sum(dim=1, keepdim=True)
     return z_values * (2.0 * left_wm - total_wm) + (total_ws - 2.0 * left_ws)
 
 
@@ -3168,8 +3178,10 @@ def oracle_region_attention(q, k, v, cfg, p_h, p_w, num_special_tokens, head_idx
     )
     num_regions = int(region_ids.max().item()) + 1
 
-    qf = q[0].float()
-    kf = k[0].float()
+    # Keep the complete dense QK computation, but let the native model dtype
+    # use Tensor Cores. Softmax and all Oracle statistics remain float32.
+    qf = q[0]
+    kf = k[0]
     vf = v[0].float()
     value_dim = vf.shape[-1]
     scale = 1.0 / math.sqrt(query_dim)
@@ -3183,7 +3195,7 @@ def oracle_region_attention(q, k, v, cfg, p_h, p_w, num_special_tokens, head_idx
             query_end = min(query_start + query_chunk_size, num_tokens)
             q_chunk = qf[:, query_start:query_end]
             logits = torch.matmul(q_chunk, kf.transpose(-1, -2)) * scale
-            dense_weights = torch.softmax(logits, dim=-1)
+            dense_weights = torch.softmax(logits, dim=-1, dtype=torch.float32)
             q_count = query_end - query_start
             flat_q_count = num_heads * q_count
             flat_weights = dense_weights.reshape(flat_q_count, num_tokens)
@@ -3232,18 +3244,10 @@ def oracle_region_attention(q, k, v, cfg, p_h, p_w, num_special_tokens, head_idx
                 batch_size = max(1, (remaining_keys + rounds_left - 1) // rounds_left)
                 residual = selected_num - selected_mass[..., None] * dense_mu
                 residual_norm = torch.linalg.vector_norm(residual, dim=-1)
-                best_objective = torch.full(
-                    (flat_q_count, batch_size),
-                    math.inf,
-                    device=q.device,
-                    dtype=torch.float32,
+                piecewise_state = _oracle_piecewise_abs_prepare(
+                    selected_mass, dense_mass, mu_norm
                 )
-                best_indices = torch.full(
-                    (flat_q_count, batch_size),
-                    -1,
-                    device=q.device,
-                    dtype=torch.long,
-                )
+                objective_all = torch.empty_like(flat_weights)
 
                 # Score all candidates against the current S_t, then retain
                 # the best batch. The batch is applied together before the
@@ -3256,8 +3260,8 @@ def oracle_region_attention(q, k, v, cfg, p_h, p_w, num_special_tokens, head_idx
                     )
                     candidate_weights = flat_weights[:, candidate_start:candidate_end]
                     candidate_total = selected_total[:, None] + candidate_weights
-                    mass_before = _oracle_piecewise_abs_sum(
-                        selected_mass, dense_mass, mu_norm, candidate_total
+                    mass_before = _oracle_piecewise_abs_eval(
+                        piecewise_state, candidate_total
                     )
 
                     candidate_mass = selected_mass.gather(1, candidate_regions) + candidate_weights
@@ -3302,27 +3306,18 @@ def oracle_region_attention(q, k, v, cfg, p_h, p_w, num_special_tokens, head_idx
                     objective = objective.masked_fill(
                         selected_mask[:, candidate_start:candidate_end], math.inf
                     )
+                    objective_all[:, candidate_start:candidate_end] = objective
 
-                    local_batch = min(batch_size, objective.shape[1])
-                    local_objective, local_index = torch.topk(
-                        objective, k=local_batch, dim=1, largest=False, sorted=False
-                    )
-                    local_index = local_index + candidate_start
-
-                    merged_objective = torch.cat(
-                        [best_objective, local_objective], dim=1
-                    )
-                    merged_indices = torch.cat([best_indices, local_index], dim=1)
-                    best_objective, best_positions = torch.topk(
-                        merged_objective,
-                        k=batch_size,
-                        dim=1,
-                        largest=False,
-                        sorted=False,
-                    )
-                    best_indices = merged_indices.gather(1, best_positions)
-
-                chosen = best_indices
+                # One global top-k per round, after all candidate chunks have
+                # been scored. This avoids repeatedly top-k'ing the growing
+                # shortlist once per candidate chunk.
+                _, chosen = torch.topk(
+                    objective_all,
+                    k=batch_size,
+                    dim=1,
+                    largest=False,
+                    sorted=False,
+                )
                 chosen_mass = flat_weights.gather(1, chosen)
                 chosen_region = region_ids[chosen]
                 chosen_value = vf[flat_head_ids[:, None], chosen]
@@ -3356,19 +3351,9 @@ def oracle_region_attention(q, k, v, cfg, p_h, p_w, num_special_tokens, head_idx
             rep_error = (
                 sparse_mass * torch.linalg.vector_norm(sparse_mu - dense_mu, dim=-1)
             ).sum(dim=1)
-            dense_output = torch.zeros(
-                (flat_q_count, value_dim), device=q.device, dtype=torch.float32
-            )
-            for candidate_start in range(0, num_tokens, candidate_chunk_size):
-                candidate_end = min(candidate_start + candidate_chunk_size, num_tokens)
-                candidate_indices = token_indices[candidate_start:candidate_end]
-                candidate_values = vf[
-                    flat_head_ids[:, None], candidate_indices[None, :], :
-                ]
-                dense_output += (
-                    flat_weights[:, candidate_start:candidate_end, None]
-                    * candidate_values
-                ).sum(dim=1)
+            # dense_num is already the dense weighted Value sum grouped by
+            # region, so a second pass over all keys is unnecessary.
+            dense_output = dense_num.sum(dim=1)
             output_error = torch.linalg.vector_norm(sparse_output - dense_output, dim=-1) / (
                 torch.linalg.vector_norm(dense_output, dim=-1) + 1e-6
             )

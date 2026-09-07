@@ -10,9 +10,9 @@ model:
     block_size: 4
     layer_start: 0
     layer_end: 0
-    query_chunk_size: 4
-    candidate_chunk_size: 256
-    greedy_rounds: 3
+    query_chunk_size: 8
+    candidate_chunk_size: 1024
+    greedy_rounds: 2
 
 datasets:
   eth3d:

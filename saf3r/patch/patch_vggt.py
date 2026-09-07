@@ -433,7 +433,7 @@ def patch_model(model, model_cfg):
                     "block_size": block_size,
                     "query_chunk_size": int(patch_cfg.get("query_chunk_size", 1)),
                     "candidate_chunk_size": int(patch_cfg.get("candidate_chunk_size", 256)),
-                    "greedy_rounds": int(patch_cfg.get("greedy_rounds", 3)),
+                    "greedy_rounds": int(patch_cfg.get("greedy_rounds", 2)),
                 }
             ]
             for layer_idx in layer_indices
