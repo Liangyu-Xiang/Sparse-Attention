@@ -1,0 +1,17 @@
+defaults:
+  - eval_vggt_eth3d_local.yaml
+  - _self_
+
+
+model:
+  patch_module:
+    type: query_topk_keys
+    keep_ratio: 0.10
+    layer_start: 0
+    layer_end: 0
+    query_chunk_size: 64
+
+datasets:
+  eth3d:
+    max_frames: 128
+    eval_tasks: [pose, recon_unposed]
