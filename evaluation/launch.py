@@ -25,6 +25,7 @@ def run_evaluation_script(script_name, args):
         "--config_path", args.config_path, 
         "--config", args.config
     ]
+    cmd.extend(args.overrides)
     
     # Run the script and automatically raise an error if it fails
     subprocess.run(cmd, check=True)
@@ -56,9 +57,13 @@ if __name__ == "__main__":
         "--config", type=str, default="vggt_evaluation.yaml",
         help="Name of the config file (with or without .yaml extension, default: vggt_evaluation)"
     )
+    parser.add_argument(
+        "overrides", nargs="*",
+        help="Optional Hydra overrides forwarded to the selected evaluation scripts."
+    )
     args = parser.parse_args()
 
     with initialize(version_base=None, config_path=args.config_path):
-        cfg = compose(config_name=args.config)
+        cfg = compose(config_name=args.config, overrides=args.overrides)
 
     main(cfg, args)

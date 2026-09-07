@@ -1,0 +1,10 @@
+defaults:
+  - eval_vggt_eth3d_block_covred_r10.yaml
+  - _self_
+
+
+datasets:
+  eth3d:
+    scenes: ["pipes"]
+    max_frames: 8
+    eval_tasks: [pose]

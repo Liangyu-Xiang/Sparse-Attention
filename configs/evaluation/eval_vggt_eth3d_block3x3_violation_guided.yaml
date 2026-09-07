@@ -1,0 +1,10 @@
+defaults:
+  - eval_vggt_eth3d_block3x3_violation_base.yaml
+  - _self_
+
+
+model:
+  patch_module:
+    refinement_strategy: violation
+    candidate_selection: dispersion
+    pair_selection: optimal

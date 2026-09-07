@@ -1,0 +1,19 @@
+defaults:
+  - eval_vggt_eth3d_local.yaml
+  - _self_
+
+
+model:
+  patch_module:
+    type: block2x2_keys
+    block_size: 2
+    selection: all
+    layer_start: 11
+    layer_end: 15
+    q_sample_count: 256
+    include_special_keys: True
+    seed: 0
+
+datasets:
+  eth3d:
+    eval_tasks: [pose, recon_unposed]

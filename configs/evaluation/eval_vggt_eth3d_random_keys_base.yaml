@@ -1,0 +1,17 @@
+defaults:
+  - eval_vggt_eth3d_local.yaml
+  - _self_
+
+
+model:
+  patch_module:
+    type: random_keys
+    keep_ratio: 0.5
+    replace_with_neighbors: False
+    neighbor_size: 0
+    include_special_keys: True
+    seed: 0
+
+datasets:
+  eth3d:
+    eval_tasks: [pose, recon_unposed]

@@ -1,0 +1,11 @@
+defaults:
+  - eval_vggt_eth3d_fixed_keys_base.yaml
+  - _self_
+
+
+model:
+  patch_module:
+    selection: random
+    keep_ratio: 0.5
+    layer_start: 16
+    layer_end: 23

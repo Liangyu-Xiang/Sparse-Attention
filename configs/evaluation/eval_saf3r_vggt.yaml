@@ -6,7 +6,7 @@ defaults:
 model:
   name: VGGT
   dpt_only: True
-  ckpt_path: checkpoints/vggt/model_tracker_fixed_e20.pt
+  ckpt_path: /data/mmc_lyxiang/3D/vggt/ckpt/model.pt
 
   # SAF3R patching
   sparse_config_path: configs/sparse_attn/vggt/eth3d-train-fltr-calib_cmpmse.json
@@ -44,7 +44,7 @@ datasets:
 
   eth3d:
     max_frames: 128
-    eval_tasks: [pose, depth]
+    eval_tasks: [pose, depth, recon_unposed]
 
   scannetpp:
     max_frames: 128

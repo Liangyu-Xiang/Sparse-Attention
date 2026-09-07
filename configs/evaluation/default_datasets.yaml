@@ -26,6 +26,7 @@ datasets:
     eval_tasks: [pose, depth, recon_unposed]
 
   eth3d:
+    data_root: Null  # Optional override, e.g. /data/mmc_lyxiang/dataset/ETH3D
     scenes: [
       "courtyard", "electro", "kicker", "pipes", "relief", "delivery_area",
       "facade", "office", "playground", "relief_2", "terrains",

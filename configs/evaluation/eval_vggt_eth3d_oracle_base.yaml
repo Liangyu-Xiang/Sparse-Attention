@@ -1,0 +1,21 @@
+defaults:
+  - eval_vggt_eth3d_local.yaml
+  - _self_
+
+
+model:
+  patch_module:
+    type: oracle_region_keys
+    keep_ratio: 0.10
+    block_size: 4
+    layer_start: 0
+    layer_end: 0
+    query_chunk_size: 4
+    candidate_chunk_size: 256
+    greedy_rounds: 3
+
+datasets:
+  eth3d:
+    scenes: [courtyard, electro, kicker]
+    max_frames: 128
+    eval_tasks: [pose, recon_unposed]

@@ -1,0 +1,12 @@
+defaults:
+  - eval_vggt.yaml
+  - _self_
+
+
+selected_datasets: [eth3d]
+
+datasets:
+  eth3d:
+    data_root: /ssd_data/mmc_lyxiang/dataset/eth3d
+    max_frames: 128
+    eval_tasks: [pose, depth, recon_unposed]

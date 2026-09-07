@@ -1,0 +1,27 @@
+defaults:
+  - eval_vggt_eth3d_local.yaml
+  - _self_
+
+
+model:
+  sparse_config_path: configs/sparse_attn/vggt/eth3d-train-fltr-calib_cmpmse.json
+  patch_module:
+    type: block3x3_violation_keys
+    topk: 4
+    block_size: 3
+    allocation_scope: budgeted_uniform
+    candidate_ratio: 0.3
+    refinement_ratio: 0.1
+    enforce_saf3r_budget: True
+    dispersion_lambda: 0.5
+    violation_alpha: 0.5
+    refinement_strategy: violation
+    candidate_selection: dispersion
+    pair_selection: optimal
+    query_chunk_size: 8
+    include_special_keys: True
+    seed: 0
+
+datasets:
+  eth3d:
+    eval_tasks: [pose, recon_unposed]

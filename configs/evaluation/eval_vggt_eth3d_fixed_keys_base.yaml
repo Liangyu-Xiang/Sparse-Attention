@@ -1,0 +1,17 @@
+defaults:
+  - eval_vggt_eth3d_local.yaml
+  - _self_
+
+
+model:
+  patch_module:
+    type: fixed_keys
+    selection: uniform
+    keep_ratio: 0.2
+    layer_start: 0
+    layer_end: 10
+    seed: 0
+
+datasets:
+  eth3d:
+    eval_tasks: [pose, recon_unposed]

@@ -28,6 +28,9 @@ def get_depth_eval_meta(dataset_name, align_method):
         eval_kwargs["max_depth"] = 1000000.0  # no truncation (from DA3Bench constants)
     elif dataset_name.lower() == "eth3d":
         eval_kwargs["max_depth"] = 100000.0   # no truncation (from DA3Bench constants)
+        # ETH3D depth maps are high-resolution; evaluating them on the same GPU as
+        # the model can OOM after inference, so keep this metric on CPU.
+        eval_kwargs["use_gpu"] = False
     elif dataset_name.lower() == "scannetpp":
         eval_kwargs["max_depth"] = 5.0        # Maximum depth for integration (meters) (from DA3Bench constants)
     elif dataset_name.lower() == "hiroom":

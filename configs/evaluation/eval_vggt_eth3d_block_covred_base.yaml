@@ -1,0 +1,26 @@
+defaults:
+  - eval_vggt_eth3d_local.yaml
+  - _self_
+
+
+model:
+  patch_module:
+    type: block_coverage_redundancy_keys
+    keep_ratio: 0.1
+    coverage_ratio: 0.2
+    layer_start: 0
+    layer_end: 23
+    block_size: 2
+    top_block_ratio: 0.2
+    query_block_chunk_size: 8
+    distance_anchor_count: 16
+    distance_block_chunk_size: 4096
+    normalize_distance: True
+    spatial_distance_weight: 1.0
+    temporal_distance_weight: 1.0
+    include_special_keys: False
+    seed: 0
+
+datasets:
+  eth3d:
+    eval_tasks: [pose, recon_unposed]

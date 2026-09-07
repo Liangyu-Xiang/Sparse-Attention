@@ -1,0 +1,8 @@
+defaults:
+  - eval_vggt_eth3d_ranked_middle_keys_base.yaml
+  - _self_
+
+
+model:
+  patch_module:
+    selection: spatial_attention

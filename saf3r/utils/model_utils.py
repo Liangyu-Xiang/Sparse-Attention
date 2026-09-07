@@ -11,6 +11,7 @@ from .geometry_utils import estimate_intrinsics_from_pointmaps
 from ..models.official_pi3.utils.geometry import se3_inverse
 from ..models.official_vggt.utils.pose_enc import pose_encoding_to_extri_intri
 from ..patch import patch_model, update_args_per_forward
+from ..patch.wrapper import collect_sparsity_counters, reset_sparsity_counters
 
 
 # Model init
@@ -85,24 +86,31 @@ def infer_model(model, model_cfg, scene_data):
     name = model_cfg.name.lower()
 
     # Update args (e.g., patch dimensions) before each forward pass
+    collect_sparsity = model_cfg.get("patch_module", None) is not None
     match name:
-        case _ if model_cfg.get("patch_module", None) is not None:
+        case _ if collect_sparsity:
             tmp_img = load_images(model, name, scene_data.image_files[:1])
             img_height, img_width = tmp_img.shape[-2], tmp_img.shape[-1]
             update_args_per_forward(model, name, img_height, img_width)
+            reset_sparsity_counters(model)
 
     # Forward model and obtain predictions in a unified format
     match name:
         case _ if "streamvggt" in name:
-            return infer_streamvggt(model, scene_data)
+            pred_data, stats = infer_streamvggt(model, scene_data)
         case _ if "vggt" in name:
-            return infer_vggt(model, scene_data)
+            pred_data, stats = infer_vggt(model, scene_data)
         case _ if "pi3" in name:
-            return infer_pi3(model, scene_data)
+            pred_data, stats = infer_pi3(model, scene_data)
         case _ if "da3" in name:
-            return infer_da3(model, scene_data)
+            pred_data, stats = infer_da3(model, scene_data)
         case _:
             raise NotImplementedError(f"Model {model_cfg.name} not implemented in infer_model()")
+
+    if collect_sparsity:
+        stats.sparsity = collect_sparsity_counters(model)
+
+    return pred_data, stats
 
 
 @contextmanager

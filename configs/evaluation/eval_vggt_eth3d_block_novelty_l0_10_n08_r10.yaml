@@ -1,0 +1,8 @@
+defaults:
+  - eval_vggt_eth3d_block_novelty_l0_10_n08_base.yaml
+  - _self_
+
+
+model:
+  patch_module:
+    keep_ratio: 0.1

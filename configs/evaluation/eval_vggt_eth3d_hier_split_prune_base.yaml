@@ -1,0 +1,24 @@
+defaults:
+  - eval_vggt_eth3d_local.yaml
+  - _self_
+
+
+model:
+  patch_module:
+    type: hier_split_prune_keys
+    strategy: hierarchical
+    patch_budget: 64
+    max_rounds: 1
+    gamma: 1.0
+    use_multiplicity_correction: True
+    include_special_keys: True
+    strict_patch_budget: False
+    query_chunk_size: 8
+    eps: 1e-6
+    seed: 0
+    stats_dir: null
+
+datasets:
+  eth3d:
+    max_frames: 16
+    eval_tasks: [pose, recon_unposed]

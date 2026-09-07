@@ -1,0 +1,9 @@
+defaults:
+  - eval_vggt_eth3d_block_novelty_l0_10_base.yaml
+  - _self_
+
+
+model:
+  patch_module:
+    attn_weight: 0.2
+    novelty_weight: 0.8

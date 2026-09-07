@@ -318,7 +318,7 @@ def load_depths_eth3d(gt_image_files):
             np.logical_not(invalid_mask_from_gt),
             np.logical_not(invalid_mask_from_gt_depth)
         )
-        gt_depth = gt_depth * zero_mask.astype(np.float32)
+        gt_depth = np.where(zero_mask, gt_depth, 0.0).astype(np.float32)
 
         gt_depths.append(gt_depth)
 
